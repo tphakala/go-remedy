@@ -156,3 +156,22 @@ func TestLimiter_WaitReturnsImmediatelyWithToken(t *testing.T) {
 	// Should return in less than 10ms when token is available
 	assert.Less(t, elapsed, 10*time.Millisecond)
 }
+
+func TestNew_PanicsOnInvalidRate(t *testing.T) {
+	tests := []struct {
+		name string
+		rate float64
+	}{
+		{"zero", 0},
+		{"negative", -1},
+		{"negative_fraction", -0.5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.PanicsWithValue(t, "ratelimit: requestsPerSecond must be > 0", func() {
+				New(tt.rate)
+			})
+		})
+	}
+}

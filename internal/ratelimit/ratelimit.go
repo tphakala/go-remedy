@@ -20,7 +20,12 @@ type Limiter struct {
 // New creates a new rate limiter with the specified requests per second.
 // The bucket starts full with capacity equal to requestsPerSecond,
 // allowing initial burst up to that limit.
+// Panics if requestsPerSecond is not positive.
 func New(requestsPerSecond float64) *Limiter {
+	if requestsPerSecond <= 0 {
+		panic("ratelimit: requestsPerSecond must be > 0")
+	}
+
 	return &Limiter{
 		tokens:     requestsPerSecond,
 		maxTokens:  requestsPerSecond,
