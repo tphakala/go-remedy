@@ -86,6 +86,7 @@ func (s *attachmentService) Upload(ctx context.Context, form, entryID, fieldName
 
 	req, cancel, err := s.client.newRequest(ctx, http.MethodPost, path, pr)
 	if err != nil {
+		_ = pw.CloseWithError(err) // Unblock the writer goroutine
 		return fmt.Errorf("creating upload request: %w", err)
 	}
 	defer cancel()
