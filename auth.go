@@ -129,16 +129,16 @@ func (c *Client) Logout(ctx context.Context) error {
 
 	resp, err := c.do(req)
 	if err != nil {
-		// Clear token even if request fails
-		c.setToken("")
+		// Clear token and expiry even if request fails
+		c.setTokenWithExpiry("", time.Time{})
 		return fmt.Errorf("logout request: %w", err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 
-	// Clear token regardless of response
-	c.setToken("")
+	// Clear token and expiry regardless of response
+	c.setTokenWithExpiry("", time.Time{})
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return c.parseAPIError(resp)

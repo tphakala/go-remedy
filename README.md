@@ -229,11 +229,16 @@ defer reader.Close()
 data, err := io.ReadAll(reader)
 
 // Upload attachment
-file, _ := os.Open("document.pdf")
+file, err := os.Open("document.pdf")
+if err != nil {
+    log.Fatal(err)
+}
 defer file.Close()
 
-err := client.Attachments().Upload(ctx, "Form", "EntryID", "FieldName",
-    "document.pdf", file)
+if err := client.Attachments().Upload(ctx, "Form", "EntryID", "FieldName",
+    "document.pdf", file); err != nil {
+    log.Fatal(err)
+}
 ```
 
 ### Error Handling
