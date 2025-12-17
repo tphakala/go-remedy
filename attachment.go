@@ -70,11 +70,13 @@ func (s *attachmentService) Upload(ctx context.Context, form, entryID, fieldName
 
 		part, err := writer.CreateFormFile("entry", filename)
 		if err != nil {
+			_ = writer.Close() // Clean up multipart writer on error
 			errCh <- fmt.Errorf("creating form file: %w", err)
 			return
 		}
 
 		if _, err := io.Copy(part, data); err != nil {
+			_ = writer.Close() // Clean up multipart writer on error
 			errCh <- fmt.Errorf("copying data: %w", err)
 			return
 		}
