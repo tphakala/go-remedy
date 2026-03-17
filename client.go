@@ -398,4 +398,3 @@ func entryPath(form string) string {
 func entryIDPath(form, entryID string) string {
 	return entryPath(form) + "/" + url.PathEscape(entryID)
 }
-

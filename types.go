@@ -54,4 +54,3 @@ type apiErrorResponse struct {
 	MessageAppendedText string `json:"messageAppendedText"`
 	MessageNumber       int    `json:"messageNumber"`
 }
-

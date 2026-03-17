@@ -67,13 +67,13 @@ type QueryOption func(*queryOptions)
 
 // queryOptions holds the configuration for query operations.
 type queryOptions struct {
-	fields       []string
+	fields        []string
 	qualification string
-	sortField    string
-	sortOrder    SortOrder
-	limit        int
-	offset       int
-	expand       []string
+	sortField     string
+	sortOrder     SortOrder
+	limit         int
+	offset        int
+	expand        []string
 }
 
 // WithFields specifies which fields to return in the response.

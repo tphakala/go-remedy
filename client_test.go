@@ -183,33 +183,33 @@ func TestAPIError_Error(t *testing.T) {
 
 func TestAPIError_Is(t *testing.T) {
 	tests := []struct {
-		name       string
-		err        *APIError
-		target     error
+		name        string
+		err         *APIError
+		target      error
 		shouldMatch bool
 	}{
 		{
-			name:       "unauthorized",
-			err:        &APIError{StatusCode: 401},
-			target:     ErrUnauthorized,
+			name:        "unauthorized",
+			err:         &APIError{StatusCode: 401},
+			target:      ErrUnauthorized,
 			shouldMatch: true,
 		},
 		{
-			name:       "forbidden",
-			err:        &APIError{StatusCode: 403},
-			target:     ErrForbidden,
+			name:        "forbidden",
+			err:         &APIError{StatusCode: 403},
+			target:      ErrForbidden,
 			shouldMatch: true,
 		},
 		{
-			name:       "not found",
-			err:        &APIError{StatusCode: 404},
-			target:     ErrNotFound,
+			name:        "not found",
+			err:         &APIError{StatusCode: 404},
+			target:      ErrNotFound,
 			shouldMatch: true,
 		},
 		{
-			name:       "no match",
-			err:        &APIError{StatusCode: 500},
-			target:     ErrUnauthorized,
+			name:        "no match",
+			err:         &APIError{StatusCode: 500},
+			target:      ErrUnauthorized,
 			shouldMatch: false,
 		},
 	}
