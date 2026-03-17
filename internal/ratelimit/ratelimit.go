@@ -101,4 +101,3 @@ func (l *Limiter) refill() {
 		l.tokens = l.maxTokens
 	}
 }
-
