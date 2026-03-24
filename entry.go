@@ -2,9 +2,11 @@ package remedy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // entryService implements EntryServicer for CRUD operations on form entries.
@@ -95,9 +97,45 @@ func (s *entryService) Create(ctx context.Context, form string, values map[strin
 		return nil, fmt.Errorf("creating create request: %w", err)
 	}
 
-	var entry Entry
-	if err := s.client.doAndDecode(req, cancel, &entry); err != nil {
+	resp, err := s.client.do(req)
+	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("creating entry: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+		cancel()
+	}()
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, s.client.parseAPIError(resp)
+	}
+
+	var entry Entry
+
+	// Remedy 25.2+ might return 201 Created with empty body but Location header
+	if resp.StatusCode == http.StatusCreated && (resp.ContentLength == 0 || resp.Header.Get("Content-Length") == "0") {
+		location := resp.Header.Get("Location")
+		if location != "" {
+			parts := strings.Split(location, "/")
+			entryID := parts[len(parts)-1]
+			entry.Values = map[string]any{"Entry_id": entryID}
+			return &entry, nil
+		}
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&entry); err != nil {
+		// If it's 201 but decoding failed (maybe empty body), still try to get ID from location
+		if resp.StatusCode == http.StatusCreated {
+			location := resp.Header.Get("Location")
+			if location != "" {
+				parts := strings.Split(location, "/")
+				entryID := parts[len(parts)-1]
+				entry.Values = map[string]any{"Entry_id": entryID}
+				return &entry, nil
+			}
+		}
+		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
 	return &entry, nil
