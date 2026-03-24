@@ -3,9 +3,12 @@ package remedy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 )
 
@@ -115,24 +118,16 @@ func (s *entryService) Create(ctx context.Context, form string, values map[strin
 
 	// Remedy 25.2+ might return 201 Created with empty body but Location header
 	if resp.StatusCode == http.StatusCreated && (resp.ContentLength == 0 || resp.Header.Get("Content-Length") == "0") {
-		location := resp.Header.Get("Location")
-		if location != "" {
-			parts := strings.Split(location, "/")
-			entryID := parts[len(parts)-1]
-			entry.Values = map[string]any{"Entry_id": entryID}
-			return &entry, nil
+		if e, ok := entryFromLocation(resp); ok {
+			return e, nil
 		}
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&entry); err != nil {
-		// If it's 201 but decoding failed (maybe empty body), still try to get ID from location
-		if resp.StatusCode == http.StatusCreated {
-			location := resp.Header.Get("Location")
-			if location != "" {
-				parts := strings.Split(location, "/")
-				entryID := parts[len(parts)-1]
-				entry.Values = map[string]any{"Entry_id": entryID}
-				return &entry, nil
+		// If it's 201 with an empty body (io.EOF), try Location header fallback
+		if errors.Is(err, io.EOF) && resp.StatusCode == http.StatusCreated {
+			if e, ok := entryFromLocation(resp); ok {
+				return e, nil
 			}
 		}
 		return nil, fmt.Errorf("decoding response: %w", err)
@@ -226,4 +221,25 @@ func (s *entryService) Merge(ctx context.Context, form string, values map[string
 	}
 
 	return &entry, nil
+}
+
+// entryFromLocation extracts the entry ID from the Location header and returns
+// a minimal Entry. Returns false if the Location header is missing or unparseable.
+func entryFromLocation(resp *http.Response) (*Entry, bool) {
+	location := resp.Header.Get("Location")
+	if location == "" {
+		return nil, false
+	}
+
+	u, err := url.Parse(location)
+	if err != nil {
+		return nil, false
+	}
+
+	entryID := path.Base(strings.TrimRight(u.Path, "/"))
+	if entryID == "" || entryID == "." {
+		return nil, false
+	}
+
+	return &Entry{Values: map[string]any{"Entry_id": entryID}}, true
 }
