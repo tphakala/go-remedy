@@ -19,6 +19,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          # No job here pushes, so keep the token out of .git/config.
+          persist-credentials: false
 
       - name: Setup Go
         uses: actions/setup-go@v7

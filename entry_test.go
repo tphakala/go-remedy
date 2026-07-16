@@ -159,6 +159,159 @@ func TestEntryService_Create(t *testing.T) {
 	assert.Equal(t, "REQ000003", entry.Values["Request ID"])
 }
 
+// newEmptyCreatedResponse builds the 201 Created reply Remedy 25.2+ sends when
+// it reports the new entry through the Location header instead of a body.
+// A contentLength of -1 mimics an unknown length, which only reveals the empty
+// body once the decoder reads it.
+func newEmptyCreatedResponse(location string, contentLength int64) *http.Response {
+	resp := &http.Response{
+		StatusCode:    http.StatusCreated,
+		Body:          io.NopCloser(bytes.NewReader(nil)),
+		Header:        make(http.Header),
+		ContentLength: contentLength,
+	}
+	if contentLength == 0 {
+		resp.Header.Set("Content-Length", "0")
+	}
+	if location != "" {
+		resp.Header.Set("Location", location)
+	}
+
+	return resp
+}
+
+func TestEntryService_Create_EmptyBodyUsesLocationHeader(t *testing.T) {
+	client := setupAuthenticatedClient(t, func(_ *http.Request) (*http.Response, error) {
+		return newEmptyCreatedResponse(
+			"https://remedy.example.com/api/arsys/v1/entry/HPD%3AHelp%20Desk/REQ000042", 0), nil
+	})
+
+	entry, err := client.Entries().Create(t.Context(), "HPD:Help Desk", map[string]any{
+		"Summary": "Test Summary",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "REQ000042", entry.Values["Entry_id"])
+}
+
+// An unknown Content-Length skips the fast path, so the empty body surfaces as
+// io.EOF from the decoder and the Location fallback has to catch it there.
+func TestEntryService_Create_UnknownLengthEmptyBodyUsesLocationHeader(t *testing.T) {
+	client := setupAuthenticatedClient(t, func(_ *http.Request) (*http.Response, error) {
+		return newEmptyCreatedResponse(
+			"https://remedy.example.com/api/arsys/v1/entry/HPD%3AHelp%20Desk/REQ000043", -1), nil
+	})
+
+	entry, err := client.Entries().Create(t.Context(), "HPD:Help Desk", map[string]any{
+		"Summary": "Test Summary",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "REQ000043", entry.Values["Entry_id"])
+}
+
+func TestEntryService_Create_EmptyBodyWithoutLocationHeaderReturnsError(t *testing.T) {
+	client := setupAuthenticatedClient(t, func(_ *http.Request) (*http.Response, error) {
+		return newEmptyCreatedResponse("", 0), nil
+	})
+
+	_, err := client.Entries().Create(t.Context(), "HPD:Help Desk", map[string]any{
+		"Summary": "Test Summary",
+	})
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, io.EOF)
+}
+
+// A body still wins over the Location header when Remedy sends one.
+func TestEntryService_Create_BodyTakesPrecedenceOverLocationHeader(t *testing.T) {
+	expectedEntry := Entry{Values: map[string]any{"Request ID": "REQ000044"}}
+
+	client := setupAuthenticatedClient(t, func(_ *http.Request) (*http.Response, error) {
+		resp := newMockResponse(http.StatusCreated, expectedEntry)
+		resp.Header.Set("Location",
+			"https://remedy.example.com/api/arsys/v1/entry/HPD%3AHelp%20Desk/REQ999999")
+
+		return resp, nil
+	})
+
+	entry, err := client.Entries().Create(t.Context(), "HPD:Help Desk", map[string]any{
+		"Summary": "Test Summary",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "REQ000044", entry.Values["Request ID"])
+	assert.NotContains(t, entry.Values, "Entry_id")
+}
+
+func TestEntryFromLocation(t *testing.T) {
+	tests := []struct {
+		name     string
+		location string
+		wantID   string
+		wantOK   bool
+	}{
+		{
+			name:     "plain path",
+			location: "https://remedy.example.com/api/arsys/v1/entry/Form/REQ000001",
+			wantID:   "REQ000001",
+			wantOK:   true,
+		},
+		{
+			name:     "trailing slash is ignored",
+			location: "https://remedy.example.com/api/arsys/v1/entry/Form/REQ000002/",
+			wantID:   "REQ000002",
+			wantOK:   true,
+		},
+		{
+			name:     "relative path",
+			location: "/api/arsys/v1/entry/Form/REQ000003",
+			wantID:   "REQ000003",
+			wantOK:   true,
+		},
+		{
+			name:     "percent encoded id is decoded",
+			location: "https://remedy.example.com/api/arsys/v1/entry/Form/REQ%20000004",
+			wantID:   "REQ 000004",
+			wantOK:   true,
+		},
+		{
+			name:     "missing header",
+			location: "",
+			wantOK:   false,
+		},
+		{
+			name:     "unparseable url",
+			location: "://not a url",
+			wantOK:   false,
+		},
+		{
+			name:     "no id segment",
+			location: "https://remedy.example.com/",
+			wantOK:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := &http.Response{Header: make(http.Header)}
+			if tt.location != "" {
+				resp.Header.Set("Location", tt.location)
+			}
+
+			entry, ok := entryFromLocation(resp)
+
+			assert.Equal(t, tt.wantOK, ok)
+			if tt.wantOK {
+				require.NotNil(t, entry)
+				assert.Equal(t, tt.wantID, entry.Values["Entry_id"])
+			} else {
+				assert.Nil(t, entry)
+			}
+		})
+	}
+}
+
 func TestEntryService_Update(t *testing.T) {
 	client := setupAuthenticatedClient(t, func(req *http.Request) (*http.Response, error) {
 		assert.Equal(t, http.MethodPut, req.Method)
