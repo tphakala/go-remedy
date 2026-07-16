@@ -26,6 +26,9 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          # go.mod pins the minimum; CI should track the newest patch so
+          # toolchain security fixes are picked up without a go.mod bump.
+          check-latest: true
 
       - name: Check go mod tidy
         run: |
@@ -56,6 +59,9 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          # go.mod pins the minimum; CI should track the newest patch so
+          # toolchain security fixes are picked up without a go.mod bump.
+          check-latest: true
 
       - name: Download dependencies
         run: go mod download
@@ -83,6 +89,9 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          # go.mod pins the minimum; CI should track the newest patch so
+          # toolchain security fixes are picked up without a go.mod bump.
+          check-latest: true
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
@@ -104,6 +113,9 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          # go.mod pins the minimum; CI should track the newest patch so
+          # toolchain security fixes are picked up without a go.mod bump.
+          check-latest: true
 
       - name: Build
         env:
