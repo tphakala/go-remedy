@@ -12,6 +12,9 @@ import (
 	"strings"
 )
 
+// valuesKey is the JSON object key Remedy expects entry field values under.
+const valuesKey = "values"
+
 // entryService implements EntryServicer for CRUD operations on form entries.
 type entryService struct {
 	client *Client
@@ -31,14 +34,14 @@ func (s *entryService) Get(ctx context.Context, form, entryID string, opts ...Qu
 	}
 	defer s.client.queue.Release()
 
-	path := entryIDPath(form, entryID)
+	endpoint := entryIDPath(form, entryID)
 	params := buildQueryParams(opts)
 
 	if len(params) > 0 {
-		path += "?" + params.Encode()
+		endpoint += "?" + params.Encode()
 	}
 
-	req, cancel, err := s.client.newJSONRequest(ctx, http.MethodGet, path, nil)
+	req, cancel, err := s.client.newJSONRequest(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating get request: %w", err)
 	}
@@ -62,14 +65,14 @@ func (s *entryService) List(ctx context.Context, form string, opts ...QueryOptio
 	}
 	defer s.client.queue.Release()
 
-	path := entryPath(form)
+	endpoint := entryPath(form)
 	params := buildQueryParams(opts)
 
 	if len(params) > 0 {
-		path += "?" + params.Encode()
+		endpoint += "?" + params.Encode()
 	}
 
-	req, cancel, err := s.client.newJSONRequest(ctx, http.MethodGet, path, nil)
+	req, cancel, err := s.client.newJSONRequest(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating list request: %w", err)
 	}
@@ -93,7 +96,7 @@ func (s *entryService) Create(ctx context.Context, form string, values map[strin
 	}
 	defer s.client.queue.Release()
 
-	body := map[string]any{"values": values}
+	body := map[string]any{valuesKey: values}
 
 	req, cancel, err := s.client.newJSONRequest(ctx, http.MethodPost, entryPath(form), body)
 	if err != nil {
@@ -114,15 +117,24 @@ func (s *entryService) Create(ctx context.Context, form string, values map[strin
 		return nil, s.client.parseAPIError(resp)
 	}
 
-	var entry Entry
+	return decodeCreatedEntry(resp)
+}
 
+// decodeCreatedEntry builds an Entry from a successful Create response, falling
+// back to the Location header when Remedy 25.2+ answers 201 with an empty body.
+func decodeCreatedEntry(resp *http.Response) (*Entry, error) {
 	// Remedy 25.2+ might return 201 Created with empty body but Location header
 	if resp.StatusCode == http.StatusCreated && (resp.ContentLength == 0 || resp.Header.Get("Content-Length") == "0") {
 		if e, ok := entryFromLocation(resp); ok {
 			return e, nil
 		}
+		// The body is known to be empty, so decoding it can only yield io.EOF and
+		// entryFromLocation would fail again on the same headers. Report the real
+		// cause instead.
+		return nil, fmt.Errorf("empty 201 Created response with missing or invalid Location header: %w", io.EOF)
 	}
 
+	var entry Entry
 	if err := json.NewDecoder(resp.Body).Decode(&entry); err != nil {
 		// If it's 201 with an empty body (io.EOF), try Location header fallback
 		if errors.Is(err, io.EOF) && resp.StatusCode == http.StatusCreated {
@@ -150,7 +162,7 @@ func (s *entryService) Update(ctx context.Context, form, entryID string, values 
 	}
 	defer s.client.queue.Release()
 
-	body := map[string]any{"values": values}
+	body := map[string]any{valuesKey: values}
 
 	req, cancel, err := s.client.newJSONRequest(ctx, http.MethodPut, entryIDPath(form, entryID), body)
 	if err != nil {
@@ -178,13 +190,13 @@ func (s *entryService) Delete(ctx context.Context, form, entryID string, opts ..
 	}
 	defer s.client.queue.Release()
 
-	path := entryIDPath(form, entryID)
+	endpoint := entryIDPath(form, entryID)
 
 	if len(opts) > 0 {
-		path += "?options=" + url.QueryEscape(string(opts[0]))
+		endpoint += "?options=" + url.QueryEscape(string(opts[0]))
 	}
 
-	req, cancel, err := s.client.newJSONRequest(ctx, http.MethodDelete, path, nil)
+	req, cancel, err := s.client.newJSONRequest(ctx, http.MethodDelete, endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("creating delete request: %w", err)
 	}
@@ -207,10 +219,10 @@ func (s *entryService) Merge(ctx context.Context, form string, values map[string
 	}
 	defer s.client.queue.Release()
 
-	body := map[string]any{"values": values}
-	path := apiBasePath + "/mergeEntry/" + url.PathEscape(form)
+	body := map[string]any{valuesKey: values}
+	endpoint := apiBasePath + "/mergeEntry/" + url.PathEscape(form)
 
-	req, cancel, err := s.client.newJSONRequest(ctx, http.MethodPost, path, body)
+	req, cancel, err := s.client.newJSONRequest(ctx, http.MethodPost, endpoint, body)
 	if err != nil {
 		return nil, fmt.Errorf("creating merge request: %w", err)
 	}

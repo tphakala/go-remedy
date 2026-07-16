@@ -22,22 +22,23 @@ func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 func newMockResponse(statusCode int, body any) *http.Response {
-	var bodyReader io.ReadCloser
+	var data []byte
 
 	if body != nil {
-		data, err := json.Marshal(body)
+		marshalled, err := json.Marshal(body)
 		if err != nil {
 			panic("newMockResponse: " + err.Error())
 		}
-		bodyReader = io.NopCloser(bytes.NewReader(data))
-	} else {
-		bodyReader = io.NopCloser(bytes.NewReader(nil))
+		data = marshalled
 	}
 
+	// ContentLength has to match the body: a real response never reports 0
+	// while carrying one, and code may branch on the length before reading.
 	return &http.Response{
-		StatusCode: statusCode,
-		Body:       bodyReader,
-		Header:     make(http.Header),
+		StatusCode:    statusCode,
+		Body:          io.NopCloser(bytes.NewReader(data)),
+		Header:        make(http.Header),
+		ContentLength: int64(len(data)),
 	}
 }
 
