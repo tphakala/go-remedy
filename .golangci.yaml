@@ -57,6 +57,9 @@ linters:
   settings:
     gocognit:
       min-complexity: 12
+    goconst:
+      # Test literals are clearer inline than behind shared constants.
+      ignore-tests: true
     gocritic:
       disabled-checks:
         - commentFormatting
