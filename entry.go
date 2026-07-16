@@ -128,6 +128,10 @@ func decodeCreatedEntry(resp *http.Response) (*Entry, error) {
 		if e, ok := entryFromLocation(resp); ok {
 			return e, nil
 		}
+		// The body is known to be empty, so decoding it can only yield io.EOF and
+		// entryFromLocation would fail again on the same headers. Report the real
+		// cause instead.
+		return nil, fmt.Errorf("empty 201 Created response with missing or invalid Location header: %w", io.EOF)
 	}
 
 	var entry Entry

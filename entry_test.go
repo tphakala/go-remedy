@@ -223,6 +223,41 @@ func TestEntryService_Create_EmptyBodyWithoutLocationHeaderReturnsError(t *testi
 	assert.ErrorIs(t, err, io.EOF)
 }
 
+// An unknown length skips the fast path, so a missing Location leaves the
+// decoder's io.EOF as the only thing to report.
+func TestEntryService_Create_UnknownLengthEmptyBodyWithoutLocationReturnsError(t *testing.T) {
+	client := setupAuthenticatedClient(t, func(_ *http.Request) (*http.Response, error) {
+		return newEmptyCreatedResponse("", -1), nil
+	})
+
+	_, err := client.Entries().Create(t.Context(), "HPD:Help Desk", map[string]any{
+		"Summary": "Test Summary",
+	})
+
+	require.ErrorIs(t, err, io.EOF)
+	assert.Contains(t, err.Error(), "decoding response")
+}
+
+func TestEntryService_Create_MalformedBodyReturnsError(t *testing.T) {
+	client := setupAuthenticatedClient(t, func(_ *http.Request) (*http.Response, error) {
+		data := []byte(`{"values":`)
+
+		return &http.Response{
+			StatusCode:    http.StatusCreated,
+			Body:          io.NopCloser(bytes.NewReader(data)),
+			Header:        make(http.Header),
+			ContentLength: int64(len(data)),
+		}, nil
+	})
+
+	_, err := client.Entries().Create(t.Context(), "HPD:Help Desk", map[string]any{
+		"Summary": "Test Summary",
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "decoding response")
+}
+
 // A body still wins over the Location header when Remedy sends one.
 func TestEntryService_Create_BodyTakesPrecedenceOverLocationHeader(t *testing.T) {
 	expectedEntry := Entry{Values: map[string]any{"Request ID": "REQ000044"}}
