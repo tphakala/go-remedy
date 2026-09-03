@@ -24,13 +24,20 @@ jobs:
           # No job here pushes, so keep the token out of .git/config.
           persist-credentials: false
 
-      # go.mod pins the go directive to a minor version (go 1.27), so the
-      # action's default check-latest picks up the newest 1.27.x patch and its
-      # toolchain security fixes without a go.mod bump. repo-checkout: false
-      # reuses the credential-free checkout above instead of a second one.
-      - name: Run govulncheck
-        uses: golang/govulncheck-action@v1
+      # Set the Go version from go.mod explicitly rather than via
+      # golang/govulncheck-action, whose default go-version-input (stable) would
+      # take precedence over go-version-file and scan with a different toolchain
+      # than the project declares. go.mod pins the minor (go 1.27), so
+      # check-latest tracks the newest 1.27.x patch and its stdlib security
+      # fixes without a second version to keep in sync.
+      - name: Setup Go
+        uses: actions/setup-go@v7
         with:
-          repo-checkout: false
           go-version-file: go.mod
-          go-package: ./...
+          check-latest: true
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        run: govulncheck ./...

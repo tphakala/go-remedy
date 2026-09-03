@@ -5,7 +5,7 @@ A native Go client library for the BMC Remedy AR System REST API.
 [![CI](https://github.com/tphakala/go-remedy/actions/workflows/ci.yml/badge.svg)](https://github.com/tphakala/go-remedy/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/tphakala/go-remedy.svg)](https://pkg.go.dev/github.com/tphakala/go-remedy)
 [![codecov](https://codecov.io/gh/tphakala/go-remedy/branch/main/graph/badge.svg)](https://codecov.io/gh/tphakala/go-remedy)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/tphakala/go-remedy)](go.mod)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/tphakala/go-remedy)](https://github.com/tphakala/go-remedy/blob/main/go.mod)
 [![Latest tag](https://img.shields.io/github/v/tag/tphakala/go-remedy?sort=semver&label=release)](https://github.com/tphakala/go-remedy/tags)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/tphakala/go-remedy/badge)](https://scorecard.dev/viewer/?uri=github.com/tphakala/go-remedy)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
