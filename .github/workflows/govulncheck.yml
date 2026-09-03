@@ -1,4 +1,4 @@
-name: Security
+name: govulncheck
 
 on:
   push:
@@ -6,7 +6,8 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    # Run weekly on Monday at 08:00 UTC
+    # Weekly on Monday at 08:00 UTC so a newly disclosed stdlib or dependency
+    # vulnerability is caught even when nothing has been pushed.
     - cron: "0 8 * * 1"
 
 permissions:
@@ -23,12 +24,16 @@ jobs:
           # No job here pushes, so keep the token out of .git/config.
           persist-credentials: false
 
+      # Set the Go version from go.mod explicitly rather than via
+      # golang/govulncheck-action, whose default go-version-input (stable) would
+      # take precedence over go-version-file and scan with a different toolchain
+      # than the project declares. go.mod pins the minor (go 1.27), so
+      # check-latest tracks the newest 1.27.x patch and its stdlib security
+      # fixes without a second version to keep in sync.
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-          # go.mod pins the minimum; CI should track the newest patch so
-          # toolchain security fixes are picked up without a go.mod bump.
           check-latest: true
 
       - name: Install govulncheck

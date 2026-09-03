@@ -2,10 +2,14 @@
 
 A native Go client library for the BMC Remedy AR System REST API.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/tphakala/go-remedy.svg)](https://pkg.go.dev/github.com/tphakala/go-remedy)
 [![CI](https://github.com/tphakala/go-remedy/actions/workflows/ci.yml/badge.svg)](https://github.com/tphakala/go-remedy/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/tphakala/go-remedy.svg)](https://pkg.go.dev/github.com/tphakala/go-remedy)
+[![codecov](https://codecov.io/gh/tphakala/go-remedy/branch/main/graph/badge.svg)](https://codecov.io/gh/tphakala/go-remedy)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/tphakala/go-remedy)](https://github.com/tphakala/go-remedy/blob/main/go.mod)
+[![Latest tag](https://img.shields.io/github/v/tag/tphakala/go-remedy?sort=semver&label=release)](https://github.com/tphakala/go-remedy/tags)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/tphakala/go-remedy/badge)](https://scorecard.dev/viewer/?uri=github.com/tphakala/go-remedy)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/tphakala/go-remedy)](https://github.com/tphakala/go-remedy)
+[![Sponsor](https://img.shields.io/github/sponsors/tphakala?logo=githubsponsors&color=ea4aaa&label=Sponsor)](https://github.com/sponsors/tphakala)
 
 ## Features
 
@@ -24,7 +28,7 @@ A native Go client library for the BMC Remedy AR System REST API.
 go get github.com/tphakala/go-remedy
 ```
 
-Requires Go 1.25 or later.
+Requires Go 1.27 or later.
 
 ## Quick Start
 

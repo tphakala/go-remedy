@@ -1,0 +1,47 @@
+name: Release
+
+# Runs on every v* tag push and opens a draft GitHub release so the notes can
+# be reviewed before publishing. go-remedy is a pure library with no binary
+# artifacts and no in-code version constant, so there is nothing to build or
+# verify here beyond the tag itself.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Create draft GitHub release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # A release that already exists (created by hand before the workflow ran)
+      # is left alone rather than failing the job.
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Pass the tag through an env var, not a ${{ }} interpolation inside
+          # run:, so a tag name carrying shell metacharacters is seen as data.
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists, leaving it untouched"
+            exit 0
+          fi
+          # A hyphen marks a pre-release tag (e.g. v1.2.0-rc.1). Flag it so it is
+          # not published as the repo's "Latest release" and does not drive the
+          # README version badge.
+          args=(--draft --title "$TAG" --generate-notes)
+          case "$TAG" in
+            *-*) args+=(--prerelease) ;;
+          esac
+          gh release create "$TAG" "${args[@]}"

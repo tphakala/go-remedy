@@ -78,11 +78,12 @@ jobs:
       - name: Display coverage summary
         run: go tool cover -func=coverage.out | tail -1
 
+      # Coverage is informational (codecov, fail_ci_if_error: false), never a gate.
       - name: Upload coverage
-        uses: actions/upload-artifact@v7
+        uses: codecov/codecov-action@v7
         with:
-          name: coverage
-          path: coverage.out
+          files: coverage.out
+          fail_ci_if_error: false
 
   lint:
     name: Lint
@@ -105,7 +106,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.12.2
+          version: v2.13.2
 
   build:
     name: Build
