@@ -1,0 +1,36 @@
+name: govulncheck
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly on Monday at 08:00 UTC so a newly disclosed stdlib or dependency
+    # vulnerability is caught even when nothing has been pushed.
+    - cron: "0 8 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: Vulnerability Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          # No job here pushes, so keep the token out of .git/config.
+          persist-credentials: false
+
+      # go.mod pins the go directive to a minor version (go 1.27), so the
+      # action's default check-latest picks up the newest 1.27.x patch and its
+      # toolchain security fixes without a go.mod bump. repo-checkout: false
+      # reuses the credential-free checkout above instead of a second one.
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          repo-checkout: false
+          go-version-file: go.mod
+          go-package: ./...
