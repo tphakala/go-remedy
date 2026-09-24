@@ -114,7 +114,7 @@ func (s *entryService) Create(ctx context.Context, form string, values map[strin
 	}()
 
 	if resp.StatusCode >= http.StatusBadRequest {
-		return nil, s.client.parseAPIError(resp)
+		return nil, parseAPIError(resp)
 	}
 
 	return decodeCreatedEntry(resp)

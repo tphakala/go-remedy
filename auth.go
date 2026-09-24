@@ -89,7 +89,7 @@ func (c *Client) loginInternal(ctx context.Context, username, password, authStri
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return c.parseAPIError(resp)
+		return parseAPIError(resp)
 	}
 
 	// Limit read to prevent memory exhaustion from malicious servers
@@ -141,7 +141,7 @@ func (c *Client) Logout(ctx context.Context) error {
 	c.setTokenWithExpiry("", time.Time{})
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return c.parseAPIError(resp)
+		return parseAPIError(resp)
 	}
 
 	return nil

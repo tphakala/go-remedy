@@ -36,8 +36,8 @@ func (s *attachmentService) Get(ctx context.Context, form, entryID, fieldName st
 	}
 
 	if resp.StatusCode >= http.StatusBadRequest {
-		// Parse error before closing body - parseAPIError reads from resp.Body
-		apiErr := s.client.parseAPIError(resp)
+		// Parse the error before closing the body: parseAPIError reads resp.Body.
+		apiErr := parseAPIError(resp)
 		_ = resp.Body.Close()
 		cancel()
 		return nil, apiErr
@@ -109,7 +109,7 @@ func (s *attachmentService) Upload(ctx context.Context, form, entryID, fieldName
 	}
 
 	if resp.StatusCode >= http.StatusBadRequest {
-		return s.client.parseAPIError(resp)
+		return parseAPIError(resp)
 	}
 
 	return nil
@@ -138,6 +138,7 @@ func attachmentPath(form, entryID, fieldName string) string {
 // attachmentReader wraps an io.ReadCloser to also call cancel on close.
 type attachmentReader struct {
 	io.ReadCloser
+
 	cancel context.CancelFunc
 }
 

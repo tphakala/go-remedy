@@ -26,26 +26,31 @@ Hard constraints:
 | `types.go` | Wire types (`Entry`, `EntryList`, `Link`, `Field`), `SortOrder`, `DeleteOption` |
 | `internal/queue` | Single-slot semaphore that serializes requests per client |
 | `internal/ratelimit` | Token bucket limiter |
+| `fuzz_test.go` | Fuzz targets for field-name escaping, Location header parsing and error-body parsing |
+| `rules/` | ruleguard matchers (build tag `ruleguard`): generic modernization and hazard rules, plus go-remedy's own in `rules/remedy.go` |
+| `rules/rulestest/`, `rules/testdata/probe/` | Test that runs golangci-lint over the probe package and checks every matcher fires where planted, and only there |
 
 ## Commands
 
-These mirror CI (`.github/workflows/ci.yml`). All must pass before a PR is opened.
+`task check` is the full local gate (build, vet on amd64 and arm64, tidy and `go fix` check, lint, ruleguard probe, race tests). Run it before declaring any change done. The individual steps, which mirror CI (`.github/workflows/ci.yml`):
 
 ```bash
-go mod tidy                                  # CI fails if go.mod/go.sum change
-gofmt -l .                                   # must print nothing
-go vet ./...
-go test -race -count=1 ./...
-golangci-lint run ./...                      # CI pins the version in ci.yml
-go fix -diff ./...                           # must print nothing (modernizers)
-govulncheck ./...                            # also runs weekly in CI
+task tools        # install the pinned golangci-lint (.golangci-version) and govulncheck
+task fmt          # gofumpt + goimports through golangci-lint
+task lint         # golangci-lint config verify && golangci-lint run
+task rules        # compile the matchers and run the probe test
+task vet          # go vet on amd64 and arm64, plus the matchers
+task tidy:check   # go mod tidy -diff, go mod verify, go fix -diff
+task test:race    # go test -race -shuffle=on ./...
+task fuzz         # each fuzz target for 20s
+task vuln         # govulncheck ./... (also runs weekly in CI)
 ```
 
-CI also cross-builds `go build ./...` for linux, darwin and windows on amd64 and arm64, so never add platform-specific code without build constraints for all six targets.
+CI also cross-builds `go build ./...` for linux, darwin and windows on amd64 and arm64 and runs the tests on Linux (amd64 and arm64), macOS and Windows, so never add platform-specific code without build constraints for every target.
 
 ## Go version and modern Go
 
-`go.mod` declares `go 1.27`, which is the minimum toolchain. The codebase targets Go 1.26 and later, and code must be written the way current Go is written, not the way it was written in 2018. The `modernize` linter and `go fix` both flag outdated idioms; treat their findings as errors.
+`go.mod` declares `go 1.27`, which is the minimum toolchain. The codebase targets Go 1.26 and later, and code must be written the way current Go is written, not the way it was written in 2018. The ruleguard matchers in `rules/` and `go fix -diff` both flag outdated idioms; treat their findings as errors. The `modernize` linter is deliberately off because the matchers carry the same patterns, and running both leaves the reported message to run order.
 
 Required patterns (use these, do not reach for the older equivalent):
 
@@ -83,9 +88,10 @@ Break any of these and the library misbehaves against a real Remedy server even 
 - **Doc comments** on every exported identifier, starting with the identifier name. The package overview lives in `client.go`.
 - **Comments must be true.** Do not describe behavior of the Remedy server, the stdlib or another package unless it has been verified; cite the source or leave the claim out. When behavior changes, update every comment, doc comment and README section that describes it.
 - **Complexity.** `gocognit` is capped at 12. Split functions (as `decodeCreatedEntry` was split out of `Create`) rather than suppressing the linter.
-- **Lint suppressions.** `//nolint` must name the specific linter and give a reason after it. Prefer fixing the code.
+- **Lint suppressions.** `//nolint` must name the specific linter and give a reason after it (`//nolint:gosec // G304: path comes from the caller`); `nolintlint` rejects anything less. Prefer fixing the code.
 - **Magic numbers.** `mnd` is enabled; name constants (see `maxTokenSize`, `defaultTimeout`).
-- **Formatting** is plain `gofmt`. Import groups: stdlib, then third party, then this module.
+- **Dependencies.** `depguard` allows only the standard library and this module in non-test code, and bans `log` there: a library returns errors, it does not log.
+- **Formatting** is gofumpt plus goimports (`task fmt`), checked by `golangci-lint run`. Import groups: stdlib, then third party, then this module.
 - **Prose style** in code, comments, docs and commit messages: no em or en dashes; use commas, colons, semicolons, parentheses or a new sentence.
 
 ## Testing
@@ -96,12 +102,23 @@ Break any of these and the library misbehaves against a real Remedy server even 
 - Test helpers call `t.Helper()` (`thelper` lint).
 - Every new test must be able to fail: before committing, remove or break the production line it is meant to cover and confirm the test goes red. A test whose name promises a property it does not assert is a bug.
 - Cover error paths (HTTP error bodies, malformed JSON, empty bodies, context cancellation) and not only the happy path. Concurrency-related code needs a test that runs under `-race` with real contention.
+- Tests run with `-shuffle=on`, so they must not depend on execution order.
+- Code that parses server responses or escapes user input gets a fuzz target in `fuzz_test.go` asserting invariants, not just the absence of panics. Add a new target to the `fuzz` matrix in `ci.yml` and to `task fuzz`. A crash found by fuzzing is committed under `testdata/fuzz/` as a regression seed.
+
+## Lint rules (ruleguard)
+
+- `rules/*.go` are ruleguard matchers loaded by gocritic (see `.golangci.yaml`). They carry the `ruleguard` build tag, so the normal toolchain ignores them. `failOn: all` makes a rule file that fails to load break the lint run instead of being dropped silently.
+- The generic files come from a shared project template. go-remedy's own matchers live in `rules/remedy.go` and enforce the architecture invariants above: queue acquisition only through `acquireAndRateLimit` (outside `client.go` and `auth.go`), requests only through `c.do`, no unbounded `io.ReadAll` of a response body, no credential or token passed to `fmt` or `errors.New`, and no unescaped value appended to a URL path. They are gated to the root package and skip `_test.go` files.
+- Every matcher needs a `// rule: Name` section in `rules/testdata/probe/` with a `// want "..."` annotation on each line that must fire, and unannotated lines for the cases that must not. `task rules` fails when a matcher has no probe, when a want is not matched, or when a finding has no want.
+- Before relying on a new or edited matcher, break it and confirm `task rules` goes red. golangci-lint's cache is not keyed on the rule files, so run `golangci-lint cache clean` after editing one (`task rules` does).
+- To silence a matcher at a call site, use `//nolint:gocritic // <reason>`.
 
 ## CI, dependencies and releases
 
 - GitHub Actions are pinned to full commit SHAs with the version in a trailing comment (`uses: owner/action@<sha> # vN`). Keep that format when adding or bumping actions. Workflows use `permissions: contents: read` by default and `persist-credentials: false` on checkout.
 - Dependabot opens weekly PRs for Go modules (`deps` prefix) and Actions (`ci` prefix).
-- OpenSSF Scorecard runs on `main`; do not weaken workflow permissions or unpin actions.
+- The golangci-lint version is pinned once in `.golangci-version`; CI and `task tools` both read it. Bump it there, then run `golangci-lint config verify` and `task check`.
+- CodeQL and OpenSSF Scorecard run on `main`; do not weaken workflow permissions or unpin actions. Vulnerability reports go through private reporting (`SECURITY.md`).
 - A pushed `vX.Y.Z` tag creates a draft release with generated notes. A tag containing a hyphen is marked as a pre-release.
 
 ## Commits and pull requests

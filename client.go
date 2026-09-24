@@ -135,14 +135,6 @@ func (c *Client) getToken() string {
 	return c.token
 }
 
-// setToken sets the auth token (thread-safe).
-func (c *Client) setToken(token string) {
-	c.tokenMu.Lock()
-	defer c.tokenMu.Unlock()
-
-	c.token = token
-}
-
 // setTokenWithExpiry sets the auth token and its expiry time (thread-safe).
 func (c *Client) setTokenWithExpiry(token string, expiry time.Time) {
 	c.tokenMu.Lock()
@@ -336,13 +328,13 @@ func (c *Client) doAndDecode(req *http.Request, cancel context.CancelFunc, targe
 		_ = resp.Body.Close()
 	}()
 
-	return c.handleResponse(resp, target)
+	return handleResponse(resp, target)
 }
 
 // handleResponse checks the response status and decodes the body.
-func (c *Client) handleResponse(resp *http.Response, target any) error {
+func handleResponse(resp *http.Response, target any) error {
 	if resp.StatusCode >= http.StatusBadRequest {
-		return c.parseAPIError(resp)
+		return parseAPIError(resp)
 	}
 
 	if target == nil || resp.StatusCode == http.StatusNoContent {
@@ -357,7 +349,7 @@ func (c *Client) handleResponse(resp *http.Response, target any) error {
 }
 
 // parseAPIError extracts error information from an error response.
-func (c *Client) parseAPIError(resp *http.Response) error {
+func parseAPIError(resp *http.Response) error {
 	var apiErrors []apiErrorResponse
 
 	if err := json.NewDecoder(resp.Body).Decode(&apiErrors); err != nil {

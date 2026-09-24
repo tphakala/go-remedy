@@ -5,55 +5,34 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# A newer push to the same branch makes older runs irrelevant.
+# bash on every runner, Windows included (Git bash is preinstalled): the
+# default PowerShell splits `-coverprofile=coverage.out` at the dot and go test
+# then fails with ".out [setup failed]".
+defaults:
+  run:
+    shell: bash
+
+# A new push to a pull request cancels the run for the previous push; runs on
+# main are never cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  verify:
-    name: Verify
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          # No job here pushes, so keep the token out of .git/config.
-          persist-credentials: false
-
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version-file: go.mod
-          # go.mod pins the minimum; CI should track the newest patch so
-          # toolchain security fixes are picked up without a go.mod bump.
-          check-latest: true
-
-      - name: Check go mod tidy
-        run: |
-          go mod tidy
-          if [ -n "$(git diff -- go.mod go.sum)" ]; then
-            echo "::error::go.mod or go.sum is not tidy. Run 'go mod tidy' and commit the changes."
-            git diff -- go.mod go.sum
-            exit 1
-          fi
-
-      - name: Check formatting
-        run: |
-          unformatted=$(gofmt -l .)
-          if [ -n "$unformatted" ]; then
-            echo "::error::The following files are not formatted. Run 'gofmt -w .' and commit the changes."
-            echo "$unformatted"
-            exit 1
-          fi
-
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both Linux architectures plus macOS and Windows: a pure-Go library is
+        # still expected to work on all of them.
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -73,13 +52,16 @@ jobs:
         run: go mod download
 
       - name: Run tests
-        run: go test -v -race -count=1 -coverprofile=coverage.out ./...
+        run: go test -race -shuffle=on -count=1 -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Display coverage summary
+        if: matrix.os == 'ubuntu-latest'
         run: go tool cover -func=coverage.out | tail -1
 
-      # Coverage is informational (codecov, fail_ci_if_error: false), never a gate.
+      # Coverage is informational (codecov, fail_ci_if_error: false), never a
+      # gate. Only the Linux amd64 leg uploads.
       - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
           files: coverage.out
@@ -92,26 +74,98 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          # No job here pushes, so keep the token out of .git/config.
           persist-credentials: false
 
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
-          # go.mod pins the minimum; CI should track the newest patch so
-          # toolchain security fixes are picked up without a go.mod bump.
           check-latest: true
 
-      - name: Run golangci-lint
+      # .golangci-version is the single pin for the linter version; the local
+      # `task tools` reads the same file, so local and CI runs use the same
+      # binary.
+      - name: Read the pinned golangci-lint version
+        id: pin
+        run: echo "version=$(tr -d '[:space:]' < .golangci-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Install golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
-          version: v2.13.2
+          version: ${{ steps.pin.outputs.version }}
+          install-only: true
+
+      - name: Verify the linter configuration
+        run: golangci-lint config verify
+
+      - name: Lint
+        run: golangci-lint run
+
+      - name: Compile the ruleguard matchers
+        run: go vet -tags ruleguard ./rules/
+
+      # The probe test skips when golangci-lint is missing or not the pinned
+      # version; GOLANGCI_LINT_REQUIRED turns that skip into a failure here.
+      - name: Check every ruleguard matcher fires on its probe
+        env:
+          GOLANGCI_LINT_REQUIRED: '1'
+        run: go test -count=1 ./rules/rulestest/
+
+  tidy:
+    name: Tidy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Check go.mod and go.sum are tidy
+        run: go mod tidy -diff
+
+      - name: Verify module checksums
+        run: go mod verify
+
+      # modernize is off in golangci-lint (the ruleguard matchers replace it),
+      # so run the toolchain's own modernizers here.
+      - name: Check go fix has nothing to rewrite
+        run: go fix -diff ./...
+
+  vet:
+    name: Vet
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        goarch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Run go vet
+        env:
+          GOARCH: ${{ matrix.goarch }}
+        run: go vet ./...
 
   build:
     name: Build
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         goos: [linux, darwin, windows]
         goarch: [amd64, arm64]
@@ -119,15 +173,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          # No job here pushes, so keep the token out of .git/config.
           persist-credentials: false
 
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
-          # go.mod pins the minimum; CI should track the newest patch so
-          # toolchain security fixes are picked up without a go.mod bump.
           check-latest: true
 
       - name: Build
@@ -135,3 +186,31 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: go build ./...
+
+  fuzz:
+    name: Fuzz smoke
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [FuzzEscapeFieldName, FuzzEntryFromLocation, FuzzParseAPIError]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      # A short bounded run of each fuzz target guards against panics and
+      # broken invariants on unexpected input. A crash it finds belongs under
+      # testdata/fuzz as a regression seed. Not a substitute for a long local
+      # fuzz session.
+      - name: Fuzz ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: go test -run='^$' -fuzz="^${TARGET}\$" -fuzztime=20s .
