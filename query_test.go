@@ -123,7 +123,7 @@ func TestQuery_FieldNameWithSingleQuote_IsEscaped(t *testing.T) {
 
 func TestQuery_StringValueWithDoubleQuote_IsEscaped(t *testing.T) {
 	// A value must stay inside one string literal. The embedded double quotes
-	// are doubled, so the value cannot close the literal and add a condition.
+	// are doubled, which keeps the value inside one literal under the doubling rule.
 	result := NewQuery().And("Status", OpEqual, `x" OR 'Status' = "y`).Build()
 
 	assert.Equal(t, `'Status' = "x"" OR 'Status' = ""y"`, result)

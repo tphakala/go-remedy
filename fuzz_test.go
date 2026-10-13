@@ -32,10 +32,10 @@ func FuzzEscapeFieldName(f *testing.F) {
 	})
 }
 
-// FuzzQuoteValue checks that a quoted string value cannot close the
-// surrounding double quotes of a qualification early, that the quoting is
-// reversible and adds nothing but the doubled quotes, and that the string and
-// fallback branches of formatValue quote the same way.
+// FuzzQuoteValue checks that, under the doubling rule, a quoted string value
+// cannot close the surrounding double quotes of a qualification early, that the
+// quoting is reversible and adds nothing but the doubled quotes, and that the
+// string and fallback branches of formatValue quote the same way.
 func FuzzQuoteValue(f *testing.F) {
 	for _, seed := range []string{
 		"Open", "", `"`, `""`, `"""`, `Robert "Bobby" Smith`,
@@ -56,7 +56,8 @@ func FuzzQuoteValue(f *testing.F) {
 
 		inner := quoted[1 : len(quoted)-1]
 		// Every quote inside is part of a doubled pair, so the literal
-		// closes only at the last byte.
+		// closes only at the last byte under the doubling rule (backslash handling is
+		// unverified).
 		assert.NotContains(t, strings.ReplaceAll(inner, `""`, ""), `"`)
 		assert.Equal(t, value, strings.ReplaceAll(inner, `""`, `"`))
 

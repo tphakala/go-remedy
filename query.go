@@ -74,7 +74,7 @@ func (q *Query) OrSafe(field, op string, value any) *Query {
 // The qualification is inserted as given, inside parentheses, with no quoting
 // or escaping. The caller must quote and escape any values and field names in
 // it, and must not pass untrusted input, which would allow qualification
-// injection. Use And or Or for values that need escaping.
+// injection.
 func (q *Query) Raw(qualification string) *Query {
 	if len(q.conditions) > 0 {
 		q.conditions = append(q.conditions, "AND")
@@ -118,7 +118,7 @@ func (q *Query) addCondition(conjunction, field, op string, value any) {
 
 // formatCondition formats a single field condition.
 // Field names have single quotes doubled (escapeFieldName) and string values
-// have double quotes doubled (quoteValue) to prevent injection.
+// have double quotes doubled (quoteValue).
 func formatCondition(field, op string, value any) string {
 	formattedValue := formatValue(value)
 	escapedField := escapeFieldName(field)
@@ -141,8 +141,8 @@ func escapeFieldName(field string) string {
 // copied unchanged. UNVERIFIED: the BMC documentation does not say how the AR
 // server treats a backslash inside a string literal, and this has not been
 // checked against a live server. If AR also treats a backslash before a double
-// quote as an escape, a value ending in a backslash could leave the
-// literal open past its closing quote, so following text would join it.
+// quote as an escape, such a pair in the value, or a backslash at its end,
+// could close the literal early or leave it open.
 func quoteValue(s string) string {
 	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }
