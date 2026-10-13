@@ -48,9 +48,7 @@ func BenchmarkLoop(m dsl.Matcher) {
 	// Pattern 3: for range b.N (no variable). Auto-fixable: there is no loop
 	// variable to drop, so b.Loop() is a direct substitution. The Suggest names
 	// the body capture as $body (no star); the $*body spelling belongs to the
-	// match pattern and would be written out literally. MEASURED against
-	// golangci-lint 2.13.2: --fix rewrites multi-statement and empty bodies
-	// into compiling b.Loop() loops.
+	// match pattern and would be written out literally.
 	m.Match(
 		`for range $b.N { $*body }`,
 	).

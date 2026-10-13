@@ -66,12 +66,8 @@ func RandV2Migration(m dsl.Matcher) {
 		Report("rand.Seed is deprecated (Go 1.20+); global rand is auto-seeded; use rand.New(rand.NewSource($seed)) for reproducibility")
 
 	// rand.Read is deprecated (Go 1.20+). The advice is specific to math/rand, so
-	// gate on the math/rand import. MEASURED this session (golangci-lint 2.13.2,
-	// ruleguard dsl 0.3.23): even ungated, this matcher fires on math/rand.Read but
-	// not on crypto/rand.Read (which also spells rand.Read but is not deprecated),
-	// so the gate is defensive, not load-bearing here; it keeps the advice from
-	// leaking onto a crypto/rand.Read under a ruleguard version that resolves the
-	// package qualifier by name rather than by path.
+	// gate on the math/rand import; crypto/rand.Read also spells rand.Read but
+	// is not deprecated.
 	m.Match(
 		`rand.Read($b)`,
 	).
@@ -105,10 +101,10 @@ func RandV2Migration(m dsl.Matcher) {
 //
 // m.Import is required: ruleguard resolves the package name in a type pattern
 // through its standard library table, where "rand" means math/rand, so without
-// it "*rand.Rand" never matches the v2 type. MEASURED against golangci-lint
-// 2.13.1 (ruleguard 0.4.5) on 2026-08-25: with the import the rule fires on
-// every planted site; a full import path in the type string, as in
-// "*math/rand/v2.Rand", is not a fix, it silently disables every rule in rules/.
+// it "*rand.Rand" never matches the v2 type. NOT MEASURED on the current
+// golangci-lint pin: with the import the rule fires on every planted site; a
+// full import path in the type string, as in "*math/rand/v2.Rand", is not a
+// fix, it silently disables every rule in rules/.
 //
 // See: https://pkg.go.dev/math/rand/v2#Rand.N
 func RandMethodN(m dsl.Matcher) {

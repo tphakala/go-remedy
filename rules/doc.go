@@ -29,8 +29,8 @@
 //     line per Match group, each carrying a want annotation.
 //  3. Run `task rules` (go vet -tags ruleguard ./rules/, then the probe test).
 //
-// Ruleguard behaviours to keep in mind while writing one, all MEASURED
-// against golangci-lint 2.13.2 (ruleguard 0.4.5) unless noted:
+// Ruleguard behaviours to keep in mind while writing one (NOT MEASURED on the
+// current golangci-lint pin):
 //
 //   - One finding per AST node. When two matchers match the same node, only
 //     the first in load order (files in name order, functions in source order)

@@ -58,8 +58,7 @@ func RemedyUnboundedBodyRead(m dsl.Matcher) {
 // a secret passed after the fourth argument of a fmt call. It exists to
 // stop the obvious slip of formatting a secret into an error message.
 func RemedySecretInFormat(m dsl.Matcher) {
-	// One pattern per argument position: `fmt.$_($*_, $x, $*_)` matched
-	// nothing (MEASURED against golangci-lint 2.13.2).
+	// One pattern per argument position.
 	m.Match(
 		`fmt.$_($x, $*_)`,
 		`fmt.$_($_, $x, $*_)`,

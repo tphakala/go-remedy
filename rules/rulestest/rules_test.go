@@ -93,8 +93,7 @@ func TestRulesFireOnProbe(t *testing.T) {
 	// A throwaway cache. golangci-lint's analysis cache is keyed on the probe
 	// sources and the config, not on the rule files, so with the shared cache
 	// an edited matcher can keep serving the previous run's findings and a
-	// regression passes. MEASURED against golangci-lint 2.13.2: sabotaging a
-	// Match pattern left this test green until the cache was cleared.
+	// regression passes.
 	cmd.Env = append(os.Environ(), "GOLANGCI_LINT_CACHE="+t.TempDir())
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

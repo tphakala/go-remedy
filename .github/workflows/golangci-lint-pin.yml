@@ -1,0 +1,46 @@
+name: golangci-lint pin
+
+# Dependabot does not read .golangci-version, so nothing else notices when a
+# newer golangci-lint is released. This compares the pin with the latest
+# release and keeps one open issue while the pin is behind, closing it once
+# the pin is current. It never edits the pin or opens a pull request.
+on:
+  schedule:
+    # Weekly on Monday, alongside the Dependabot runs.
+    - cron: "30 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time, queued rather than cancelled, so a manual dispatch and the
+# scheduled run do not both list issues before either files one. NOT MEASURED:
+# how GitHub queues a run that overlaps another in the group.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Compare the pin with the latest release
+    # Only the upstream repository files issues, and only from main, whose
+    # .golangci-version is the pin CI uses. Forks and branch dispatches skip.
+    if: github.repository == 'tphakala/go-remedy' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # Needed to open, update and close the drift issue.
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # No job here pushes, so keep the token out of .git/config.
+          persist-credentials: false
+
+      - name: Compare and update the drift issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: bash .github/scripts/golangci-lint-pin.sh

@@ -117,7 +117,8 @@ Break any of these and the library misbehaves against a real Remedy server even 
 
 - GitHub Actions are pinned to full commit SHAs with the version in a trailing comment (`uses: owner/action@<sha> # vN`). Keep that format when adding or bumping actions. Workflows use `permissions: contents: read` by default and `persist-credentials: false` on checkout.
 - Dependabot opens weekly PRs for Go modules (`deps` prefix) and Actions (`ci` prefix).
-- The golangci-lint version is pinned once in `.golangci-version`; CI and `task tools` both read it. Bump it there, then run `golangci-lint config verify` and `task check`.
+- The golangci-lint version is pinned once in `.golangci-version`; CI and `task tools` both read it. Dependabot does not track this file. The weekly `golangci-lint-pin` workflow (`.github/scripts/golangci-lint-pin.sh`) compares it with the latest golangci-lint release and keeps one open issue while the pin is behind, closing it once the pin is current; it never edits the file. To bump, edit the file, run `task tools`, then `golangci-lint config verify` and `task check`.
+- Maintainer rule: the golangci-lint pin must always be a release that supports the Go minor declared in `go.mod`. The maintainer's position is that Go 1.27 requires golangci-lint v2.14 or newer (not measured here). Bumping the Go minor in `go.mod` means bumping the pin in the same change.
 - CodeQL and OpenSSF Scorecard run on `main`; do not weaken workflow permissions or unpin actions. Vulnerability reports go through private reporting (`SECURITY.md`).
 - A pushed `vX.Y.Z` tag creates a draft release with generated notes. A tag containing a hyphen is marked as a pre-release.
 

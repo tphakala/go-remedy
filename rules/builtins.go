@@ -158,9 +158,7 @@ func RangeOverInteger(m dsl.Matcher) {
 		Report("use for $i := range $n instead of for $i := 0; $i < $n; $i++ (Go 1.22+)").
 		// The replacement names the body capture as $body (no star): the $*body
 		// spelling belongs to the match pattern and is written out literally by
-		// --fix. MEASURED against golangci-lint 2.13.2: --fix rewrites a
-		// multi-statement body into a compiling range loop. The Where clauses
-		// above keep the rewrite semantics-preserving.
+		// --fix. The Where clauses above keep the rewrite semantics-preserving.
 		Suggest("for $i := range $n { $body }")
 }
 

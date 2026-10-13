@@ -31,9 +31,7 @@ import "github.com/quasilyte/go-ruleguard/dsl"
 // The Report texts use a literal "{ ... }" rather than $body: the body is a
 // $* capture, and interpolating it dumps the whole closure body into the
 // message, multi-line for anything but a one-statement body. The Suggest
-// templates do interpolate $body, which is what a rewrite needs. MEASURED
-// against golangci-lint 2.13.2: --fix turns a multi-statement Add/Done
-// goroutine into a compiling wg.Go call.
+// templates do interpolate $body, which is what a rewrite needs.
 //
 // See: https://pkg.go.dev/sync#WaitGroup.Go
 func WaitGroupGo(m dsl.Matcher) {
