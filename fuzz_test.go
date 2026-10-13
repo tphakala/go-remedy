@@ -12,9 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// FuzzEscapeFieldName checks that an escaped field name cannot close the
-// surrounding single quotes of a qualification, and that the escaping is
-// reversible.
+// FuzzEscapeFieldName checks that, under the doubling rule, an escaped field
+// name cannot close the surrounding single quotes of a qualification, and that
+// the escaping is reversible. It does not cover backslashes, whose treatment by
+// the AR server is unverified.
 func FuzzEscapeFieldName(f *testing.F) {
 	for _, seed := range []string{"Status", "O'Brien", "'", "''", "a' OR '1'='1", ""} {
 		f.Add(seed)

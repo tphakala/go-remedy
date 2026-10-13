@@ -125,8 +125,11 @@ func formatCondition(field, op string, value any) string {
 	return fmt.Sprintf("'%s' %s %s", escapedField, op, formattedValue)
 }
 
-// escapeFieldName escapes single quotes in field names by doubling them.
-// This prevents query injection attacks via malicious field names.
+// escapeFieldName escapes single quotes in field names by doubling them, which
+// is how a quote inside a single-quoted name is written. UNVERIFIED: how the AR
+// server treats a backslash inside a quoted field name has not been checked
+// against a live server, so a field name ending in a backslash or containing a
+// backslash before a single quote may not stay inside its quotes.
 func escapeFieldName(field string) string {
 	return strings.ReplaceAll(field, "'", "''")
 }

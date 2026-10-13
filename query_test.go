@@ -111,10 +111,11 @@ func TestQuery_FloatValue(t *testing.T) {
 }
 
 func TestQuery_FieldNameWithSingleQuote_IsEscaped(t *testing.T) {
-	// Field names containing single quotes must be escaped to prevent injection
+	// Single quotes in a field name are doubled so the name stays inside one
+	// quoted name under the doubling rule. Backslash handling is not covered.
 	// Input: Status' OR '1'='1
-	// Without escaping: 'Status' OR '1'='1' = "value" (injection!)
-	// With escaping: 'Status'' OR ''1''=''1' = "value" (safe, literal field name)
+	// Without escaping: 'Status' OR '1'='1' = "value"
+	// With escaping: 'Status'' OR ''1''=''1' = "value"
 	result := NewQuery().And("Status' OR '1'='1", "=", "value").Build()
 
 	// The field name should have its single quotes escaped by doubling them
