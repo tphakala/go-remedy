@@ -32,6 +32,40 @@ func FuzzEscapeFieldName(f *testing.F) {
 	})
 }
 
+// FuzzQuoteValue checks that a quoted string value cannot close the
+// surrounding double quotes of a qualification early, that the quoting is
+// reversible and adds nothing but the doubled quotes, and that the string and
+// fallback branches of formatValue quote the same way.
+func FuzzQuoteValue(f *testing.F) {
+	for _, seed := range []string{
+		"Open", "", `"`, `""`, `"""`, `Robert "Bobby" Smith`,
+		`a\`, `\"`, "a\nb", "a\x00b", "a\xffb", `x" OR 'Status' = "y`,
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, value string) {
+		quoted := quoteValue(value)
+
+		// Exactly the input, two outer quotes and one extra quote per
+		// embedded quote: nothing else is escaped or replaced, valid UTF-8
+		// or not.
+		require.Len(t, quoted, len(value)+2+strings.Count(value, `"`))
+		require.True(t, strings.HasPrefix(quoted, `"`), "missing opening quote")
+		require.True(t, strings.HasSuffix(quoted, `"`), "missing closing quote")
+
+		inner := quoted[1 : len(quoted)-1]
+		// Every quote inside is part of a doubled pair, so the literal
+		// closes only at the last byte.
+		assert.NotContains(t, strings.ReplaceAll(inner, `""`, ""), `"`)
+		assert.Equal(t, value, strings.ReplaceAll(inner, `""`, `"`))
+
+		assert.Equal(t, quoted, formatValue(value))
+		assert.Equal(t, quoted, formatValue(stringerValue(value)))
+		assert.Equal(t, `'Field' = `+quoted, NewQuery().And("Field", OpEqual, value).Build())
+	})
+}
+
 // FuzzEntryFromLocation checks that a Location header of any shape either is
 // rejected or yields a usable, single-segment entry ID.
 func FuzzEntryFromLocation(f *testing.F) {

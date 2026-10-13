@@ -26,7 +26,7 @@ Hard constraints:
 | `types.go` | Wire types (`Entry`, `EntryList`, `Link`, `Field`), `SortOrder`, `DeleteOption` |
 | `internal/queue` | Single-slot semaphore that serializes requests per client |
 | `internal/ratelimit` | Token bucket limiter |
-| `fuzz_test.go` | Fuzz targets for field-name escaping, Location header parsing and error-body parsing |
+| `fuzz_test.go` | Fuzz targets for field-name escaping, string-value quoting, Location header parsing and error-body parsing |
 | `rules/` | ruleguard matchers (build tag `ruleguard`): generic modernization and hazard rules, plus go-remedy's own in `rules/remedy.go` |
 | `rules/rulestest/`, `rules/testdata/probe/` | Test that runs golangci-lint over the probe package and checks every matcher fires where planted, and only there |
 

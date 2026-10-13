@@ -199,7 +199,9 @@ q := remedy.NewQuery().
     Build()
 // Result: 'Status' = "Open" AND 'Priority' < 3 OR 'Urgency' = "Critical"
 
-// Raw qualification for complex expressions
+// Raw qualification for complex expressions. Raw inserts its argument as
+// given, without quoting or escaping. Never pass untrusted input to it; use
+// And/Or for values.
 q := remedy.NewQuery().
     And("Status", "=", "Open").
     Raw("'Priority' < 3 OR 'Urgency' = \"High\"").
@@ -213,7 +215,8 @@ entries, err := client.Entries().List(ctx, "Form",
 ```
 
 Supported value types:
-- Strings: `"value"` -> `"value"`
+- Strings: wrapped in double quotes, with each embedded double quote doubled: `Robert "Bobby" Smith` -> `"Robert ""Bobby"" Smith"`. This is the rule BMC documents for AR System 20.02 ("Using fields in qualifications"). Backslashes and all other characters are passed through unchanged. How the AR server treats a backslash inside a string literal is unverified against a real server; if it also treats a backslash before a double quote as an escape, a value ending in a backslash could leave the literal open past its closing quote.
+- Other types (for example a `fmt.Stringer` or an `error`): formatted with `%v` and quoted the same way as strings
 - Integers: `123` -> `123`
 - Floats: `3.14` -> `3.14`
 - Booleans: `true` -> `1`, `false` -> `0`
