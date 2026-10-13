@@ -1,6 +1,7 @@
 package remedy
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -118,6 +119,70 @@ func TestQuery_FieldNameWithSingleQuote_IsEscaped(t *testing.T) {
 
 	// The field name should have its single quotes escaped by doubling them
 	assert.Equal(t, `'Status'' OR ''1''=''1' = "value"`, result)
+}
+
+func TestQuery_StringValueWithDoubleQuote_IsEscaped(t *testing.T) {
+	// A value must stay inside one string literal. The embedded double quotes
+	// are doubled, which keeps the value inside one literal under the doubling rule.
+	result := NewQuery().And("Status", OpEqual, `x" OR 'Status' = "y`).Build()
+
+	assert.Equal(t, `'Status' = "x"" OR 'Status' = ""y"`, result)
+}
+
+// stringerValue is a non-string type whose String method returns its text,
+// so formatValue sends it through the fallback branch.
+type stringerValue string
+
+func (s stringerValue) String() string { return string(s) }
+
+func TestFormatValue_String(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"plain", "Open", `"Open"`},
+		{"empty", "", `""`},
+		{"embedded double quote", `a"b`, `"a""b"`},
+		{"lone double quote", `"`, `""""`},
+		{"two double quotes in a row", `""`, `""""""`},
+		{"three double quotes in a row", `"""`, `""""""""`},
+		{"BMC doc example", `Robert "Bobby" Smith`, `"Robert ""Bobby"" Smith"`},
+		{"backslash unchanged", `a\b`, `"a\b"`},
+		{"trailing backslash unchanged", `a\`, `"a\"`},
+		{"backslash before quote", `a\"b`, `"a\""b"`},
+		{"newline unchanged", "a\nb", "\"a\nb\""},
+		{"tab unchanged", "a\tb", "\"a\tb\""},
+		{"printable non-ASCII", "äö 😀", "\"äö 😀\""},
+		{"non-printable rune", "a\u200bb", "\"a\u200bb\""},
+		{"invalid UTF-8", "a\xffb", "\"a\xffb\""},
+		{"single quotes untouched", `O'Brien`, `"O'Brien"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, formatValue(tt.input))
+		})
+	}
+}
+
+func TestFormatValue_Fallback(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    any
+		expected string
+	}{
+		{"stringer with quotes", stringerValue(`say "hi"`), `"say ""hi"""`},
+		{"stringer with backslash", stringerValue(`C:\tmp`), `"C:\tmp"`},
+		{"error with quotes", errors.New(`bad "x"`), `"bad ""x"""`},
+		{"plain stringer", stringerValue("Open"), `"Open"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, formatValue(tt.input))
+		})
+	}
 }
 
 func TestQuery_InvalidOperator_ReturnsError(t *testing.T) {

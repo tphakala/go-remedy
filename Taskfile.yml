@@ -38,6 +38,7 @@ tasks:
     desc: Run each fuzz target for a short bounded time
     cmds:
       - go test -run='^$' -fuzz='^FuzzEscapeFieldName$' -fuzztime={{.FUZZ_TIME}} .
+      - go test -run='^$' -fuzz='^FuzzQuoteValue$' -fuzztime={{.FUZZ_TIME}} .
       - go test -run='^$' -fuzz='^FuzzEntryFromLocation$' -fuzztime={{.FUZZ_TIME}} .
       - go test -run='^$' -fuzz='^FuzzParseAPIError$' -fuzztime={{.FUZZ_TIME}} .
 

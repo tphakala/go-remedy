@@ -70,6 +70,11 @@ func (q *Query) OrSafe(field, op string, value any) *Query {
 
 // Raw adds a raw qualification string with AND conjunction.
 // Use this for complex expressions that can't be built with And/Or.
+//
+// The qualification is inserted as given, inside parentheses, with no quoting
+// or escaping. The caller must quote and escape any values and field names in
+// it, and must not pass untrusted input, which would allow qualification
+// injection.
 func (q *Query) Raw(qualification string) *Query {
 	if len(q.conditions) > 0 {
 		q.conditions = append(q.conditions, "AND")
@@ -112,7 +117,8 @@ func (q *Query) addCondition(conjunction, field, op string, value any) {
 }
 
 // formatCondition formats a single field condition.
-// Field names have single quotes escaped by doubling them to prevent injection.
+// Field names have single quotes doubled (escapeFieldName) and string values
+// have double quotes doubled (quoteValue).
 func formatCondition(field, op string, value any) string {
 	formattedValue := formatValue(value)
 	escapedField := escapeFieldName(field)
@@ -125,11 +131,29 @@ func escapeFieldName(field string) string {
 	return strings.ReplaceAll(field, "'", "''")
 }
 
-// formatValue converts a Go value to AR qualification string format.
+// quoteValue renders s as an AR System string literal: it wraps s in double
+// quotes and doubles every double quote inside it. BMC documents this rule for
+// "Nonnumeric that include quotation marks" in Remedy AR System 20.02, "Using
+// fields in qualifications":
+// https://docs.bmc.com/docs/ars2002/using-fields-in-qualifications-909637143.html
+//
+// Every other byte, including backslashes, newlines and invalid UTF-8, is
+// copied unchanged. UNVERIFIED: the BMC documentation does not say how the AR
+// server treats a backslash inside a string literal, and this has not been
+// checked against a live server. If AR also treats a backslash before a double
+// quote as an escape, such a pair in the value, or a backslash at its end,
+// could close the literal early or leave it open.
+func quoteValue(s string) string {
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
+}
+
+// formatValue converts a Go value to AR qualification string format. Strings,
+// and the %v text of any type not listed below (for example a fmt.Stringer or
+// an error), are quoted with quoteValue.
 func formatValue(v any) string {
 	switch val := v.(type) {
 	case string:
-		return fmt.Sprintf("%q", val)
+		return quoteValue(val)
 	case int, int8, int16, int32, int64:
 		return fmt.Sprintf("%d", val)
 	case uint, uint8, uint16, uint32, uint64:
@@ -144,7 +168,7 @@ func formatValue(v any) string {
 	case nil:
 		return "$NULL$"
 	default:
-		return fmt.Sprintf("%q", fmt.Sprintf("%v", val))
+		return quoteValue(fmt.Sprintf("%v", val))
 	}
 }
 
